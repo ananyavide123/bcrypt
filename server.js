@@ -27,6 +27,20 @@ db.connect((err) => {
     console.log('Connected to MySQL');
 });
 
+// Middleware to verify JWT token
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+}
+
 // Route to register a new user
 app.post('/register', async (req, res) => {
     const { name, password, email } = req.body;
@@ -89,6 +103,47 @@ app.post('/login', (req, res) => {
         res.status(200).json({ message: 'Login successful', token });
     });
 });
+
+// Route to return logged-in user's info
+app.get('/home', authenticateToken, async (req, res) => {
+    const { name, password } = req.body;
+
+    if (!name || !password ) {
+        return res.status(400).json({ message: 'Please provide name and password' });
+    }
+
+    // Find the user in the database
+    const query = 'SELECT * FROM users WHERE name = ?';
+    db.query(query, [name], async (err, results) => {
+        if (err) {
+            console.error('Error querying database:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        if (results.length === 0) {
+            return res.status(401).json({ message: 'Invalid name or password' });
+        }
+
+        const user = results[0];
+
+        // Compare the password
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Invalid name or password' });
+        }
+
+        // Return user info
+        res.status(200).json({ password: user.password, name: user.name, email: user.email });
+    });
+});
+
+
+
+
+
+
+
+
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
