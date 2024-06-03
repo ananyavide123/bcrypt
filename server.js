@@ -16,7 +16,9 @@ const db = mysql.createConnection({
     database: 'hello',
     port: 3307
 });
-const SECRET = 'bhghghg6787897987hbhmgjfhdgfs56ghvjht78tjhbju6876yukjbhku797ihyi879y'
+
+const SECRET = 'bhghghg6787897987hbhmgjfhdgfs56ghvjht78tjhbju6876yukjbhku797ihyi879y';
+
 db.connect((err) => {
     if (err) {
         console.error('Error connecting to MySQL:', err);
@@ -27,10 +29,10 @@ db.connect((err) => {
 
 // Route to register a new user
 app.post('/register', async (req, res) => {
-    const { name: name, password, email } = req.body;
-    console.log(req.body);
+    const { name, password, email } = req.body;
+
     if (!name || !password || !email) {
-        return res.status(400).json({ message: 'Please provide name and password and email' });
+        return res.status(400).json({ message: 'Please provide name, password, and email' });
     }
 
     try {
@@ -38,7 +40,7 @@ app.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Insert user into the database
-        const query = 'INSERT INTO users (nme, password, email) VALUES (?, ?, ?)';
+        const query = 'INSERT INTO users (name, password, email) VALUES (?, ?, ?)';
         db.query(query, [name, hashedPassword, email], (err, results) => {
             if (err) {
                 console.error('Error inserting user into database:', err);
@@ -81,8 +83,8 @@ app.post('/login', (req, res) => {
             return res.status(401).json({ message: 'Invalid name or password' });
         }
 
-        // Create a JWT token
-        const token = jwt.sign({ id: user.id, name: user.name }, 'SECRET');
+        // Create a JWT token with name and email in the payload
+        const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, SECRET);
 
         res.status(200).json({ message: 'Login successful', token });
     });
