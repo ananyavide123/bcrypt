@@ -43,10 +43,11 @@ function authenticateToken(req, res, next) {
 
 // Route to register a new user
 app.post('/register', async (req, res) => {
-    const { name, password, email } = req.body;
+    const { username, fullname, password, email } = req.body;
+    console.log(username)
 
-    if (!name || !password || !email) {
-        return res.status(400).json({ message: 'Please provide name, password, and email' });
+    if (!username || !fullname || !password || !email) {
+        return res.status(400).json({ message: 'Please provide username, fullname, password, and email' });
     }
 
     try {
@@ -54,8 +55,8 @@ app.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         // Insert user into the database
-        const query = 'INSERT INTO users (name, password, email) VALUES (?, ?, ?)';
-        db.query(query, [name, hashedPassword, email], (err, results) => {
+        const query = 'INSERT INTO users (username, fullname, password, email) VALUES (?, ?, ?, ?)';
+        db.query(query, [username, fullname, hashedPassword, email], (err, results) => {
             if (err) {
                 console.error('Error inserting user into database:', err);
                 return res.status(500).json({ message: 'Internal server error' });
@@ -71,79 +72,70 @@ app.post('/register', async (req, res) => {
 
 // Route to login a user
 app.post('/login', (req, res) => {
-    const { name, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!name || !password) {
-        return res.status(400).json({ message: 'Please provide name and password' });
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Please provide username and password' });
     }
 
     // Find the user in the database
-    const query = 'SELECT * FROM users WHERE name = ?';
-    db.query(query, [name], async (err, results) => {
+    const query = 'SELECT * FROM users WHERE username = ?';
+    db.query(query, [username], async (err, results) => {
         if (err) {
             console.error('Error querying database:', err);
             return res.status(500).json({ message: 'Internal server error' });
         }
 
         if (results.length === 0) {
-            return res.status(401).json({ message: 'Invalid name or password' });
+            return res.status(401).json({ message: 'Invalid username or password' });
         }
 
         const user = results[0];
+        
+
+       
 
         // Compare the password
-        const isMatch = await bcrypt.compare(password, user.password);
+         const isMatch = await bcrypt.compare(password, user.password);
+      
+         const hashedPassword = await bcrypt.hash(password, 10);
+       
         if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid name or password' });
-        }
+             return res.status(400).json({ message: 'encrypted password' });
+         }
 
-        // Create a JWT token with name and email in the payload
-        const token = jwt.sign({ id: user.id, name: user.name, email: user.email }, SECRET);
+        // Create a JWT token with username, fullname, email, and password in the payload
+       const token = jwt.sign({ username: user.username, fullname: user.fullname, email: user.email, password: user.password }, SECRET);
 
-        res.status(200).json({ message: 'Login successful', token });
+        res.status(200).json({ message: 'Login successful' ,token});
     });
 });
+
 
 // Route to return logged-in user's info
-app.get('/home', authenticateToken, async (req, res) => {
-    const { name, password } = req.body;
-
-    if (!name || !password ) {
-        return res.status(400).json({ message: 'Please provide name and password' });
-    }
+app.get('/home', authenticateToken, (req, res) => {
+    const { username } = req.user;
 
     // Find the user in the database
-    const query = 'SELECT * FROM users WHERE name = ?';
-    db.query(query, [name], async (err, results) => {
+    const query = 'SELECT username, fullname, email FROM users WHERE username = ?';
+    db.query(query, [username], (err, results) => {
         if (err) {
             console.error('Error querying database:', err);
             return res.status(500).json({ message: 'Internal server error' });
         }
 
         if (results.length === 0) {
-            return res.status(401).json({ message: 'Invalid name or password' });
+            return res.status(401).json({ message: 'User not found' });
         }
 
         const user = results[0];
-
-        // Compare the password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid name or password' });
-        }
+        console.log(user);
 
         // Return user info
-        res.status(200).json({ password: user.password, name: user.name, email: user.email });
+        res.status(200).json({ username: user.username, fullname: user.fullname, email: user.email });
+        
     });
 });
-
-
-
-
-
-
-
-
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);
