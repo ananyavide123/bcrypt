@@ -2,12 +2,13 @@ const express = require('express');
 const mysql = require('mysql2');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const cors = require('cors');
 
 const app = express();
 const port = 3000;
 
 app.use(express.json());
-
+app.use(cors());
 // MySQL connection
 const db = mysql.createConnection({
     host: 'localhost',
@@ -41,10 +42,11 @@ function authenticateToken(req, res, next) {
     });
 }
 
+
 // Route to register a new user
 app.post('/register', async (req, res) => {
     const { username, fullname, password, email } = req.body;
-    console.log(username)
+    console.log(username);
 
     if (!username || !fullname || !password || !email) {
         return res.status(400).json({ message: 'Please provide username, fullname, password, and email' });
@@ -59,14 +61,14 @@ app.post('/register', async (req, res) => {
         db.query(query, [username, fullname, hashedPassword, email], (err, results) => {
             if (err) {
                 console.error('Error inserting user into database:', err);
-                return res.status(500).json({ message: 'Internal server error' });
+                return res.status(300).json({ message: 'Internal server error' });
             }
 
-            res.status(201).json({ message: 'User registered successfully' });
+            res.status(200).json({ message: 'User registered successfully' });
         });
     } catch (err) {
         console.error('Error hashing password:', err);
-        res.status(500).json({ message: 'Internal server error' });
+        res.status(300).json({ message: 'Internal server error' });
     }
 });
 
@@ -91,23 +93,20 @@ app.post('/login', (req, res) => {
         }
 
         const user = results[0];
-        
-
-       
 
         // Compare the password
-         const isMatch = await bcrypt.compare(password, user.password);
-      
-         const hashedPassword = await bcrypt.hash(password, 10);
-       
-        if (!isMatch) {
-             return res.status(400).json({ message: 'encrypted password' });
-         }
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        //  const hashedPassword = await bcrypt.hash(password, 10);
+
+        // if (!isMatch) {
+        //      return res.status(400).json({ message: 'encrypted password' });
+        //  }
 
         // Create a JWT token with username, fullname, email, and password in the payload
-       const token = jwt.sign({ username: user.username, fullname: user.fullname, email: user.email, password: user.password }, SECRET);
+        const token = jwt.sign({ username: user.username, fullname: user.fullname, email: user.email, password: user.password }, SECRET);
 
-        res.status(200).json({ message: 'Login successful' ,token});
+        res.status(200).json({ message: 'Login successful', token });
     });
 });
 
@@ -116,7 +115,6 @@ app.post('/login', (req, res) => {
 app.get('/home', authenticateToken, (req, res) => {
     const { username } = req.user;
 
-    // Find the user in the database
     const query = 'SELECT username, fullname, email FROM users WHERE username = ?';
     db.query(query, [username], (err, results) => {
         if (err) {
@@ -129,11 +127,19 @@ app.get('/home', authenticateToken, (req, res) => {
         }
 
         const user = results[0];
-        console.log(user);
-
-        // Return user info
         res.status(200).json({ username: user.username, fullname: user.fullname, email: user.email });
-        
+    });
+});
+
+app.get('/users', (req, res) => {
+    const query = 'SELECT username, fullname, email FROM users';
+    db.query(query, (err, results) => {
+        if (err) {
+            console.error('Error querying database:', err);
+            return res.status(500).json({ message: 'Internal server error' });
+        }
+
+        res.status(200).json(results);
     });
 });
 
